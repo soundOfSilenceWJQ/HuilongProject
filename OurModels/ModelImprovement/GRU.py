@@ -48,7 +48,7 @@ if __name__ == '__main__':
 
     pred_data = pd.Series(index=data.index, name='PRED_NEXT_RET')
 
-    for year in range(2010, 2011):  # 从2009开始滚动，到2022
+    for year in range(2009, 2012):  # 从2009开始滚动，到2022
 
         # 定义滚动窗口
         train_start = date(year, 1, 1)
@@ -82,7 +82,7 @@ if __name__ == '__main__':
             X_train_tensor = torch.load(base_path + '\X_train_tensor' + str(year) + '.pt')
             y_train_tensor = torch.load(base_path + '\y_train_tensor' + str(year) + '.pt')
 
-        if os.path.exists(base_path + '\X_valid_tensor.pt') == False:
+        if os.path.exists(base_path + '\X_valid_tensor' + str(year) + '.pt') == False:
             X_valid_tensor = get_snippets(X_valid, 3)
             y_valid_tensor = get_snippets(y_valid, 3)
             y_valid_tensor = y_valid_tensor[:, -1]
@@ -142,24 +142,28 @@ if __name__ == '__main__':
                 # print('batch mae: ', torch.mean(torch.abs(outputs - batch_targets)))
                 # print('batch targets mean:', torch.mean(batch_targets))
                 # print('batch outputs mean:', torch.mean(outputs))
+            # y_train_pred = model(X_train_tensor)
+            # print("mae:", torch.mean(torch.abs(expo(y_train_pred) - expo(y_valid_tensor))))
+            # print("mean of y_train_tensor:", torch.mean(expo(y_train_tensor)))
+            # print("mean of y_train_pred:", torch.mean(expo(y_train_pred)))
 
             print(f"Epoch {epoch + 1}/{num_epochs}, Training Loss: {loss.item():.4f}")
 
-            # 衡量在验证集上的性能
-            with torch.no_grad():
-                valid_loss = 0
-                for i in tqdm(range(0, len(X_valid_tensor), batch_size), desc=f'Epoch {epoch} valid'):
-                    # batch_x要是序列数据（前几个月的因子值）
-                    batch_inputs = X_valid_tensor[i:i + batch_size]
-                    batch_targets = y_valid_tensor[i:i + batch_size]
-                    outputs = model(batch_inputs)
-                    loss = criterion(outputs, batch_targets)
-                    valid_loss += loss.item()
-                print(f"Validation Loss: {valid_loss / len(X_valid_tensor)}")
-                y_valid_pred = model(X_valid_tensor)
-                print("mae:", torch.mean(torch.abs(expo(y_valid_pred) - expo(y_valid_tensor))))
-                print("mean of y_valid_tensor:", torch.mean(expo(y_valid_tensor)))
-                print("mean of y_valid_pred:", torch.mean(expo(y_valid_pred)))
+            # # 衡量在验证集上的性能
+            # with torch.no_grad():
+            #     valid_loss = 0
+            #     for i in tqdm(range(0, len(X_valid_tensor), batch_size), desc=f'Epoch {epoch} valid'):
+            #         # batch_x要是序列数据（前几个月的因子值）
+            #         batch_inputs = X_valid_tensor[i:i + batch_size]
+            #         batch_targets = y_valid_tensor[i:i + batch_size]
+            #         outputs = model(batch_inputs)
+            #         loss = criterion(outputs, batch_targets)
+            #         valid_loss += loss.item()
+            #     print(f"Validation Loss: {valid_loss / len(X_valid_tensor)}")
+            #     y_valid_pred = model(X_valid_tensor)
+            #     print("mae:", torch.mean(torch.abs(expo(y_valid_pred) - expo(y_valid_tensor))))
+            #     print("mean of y_valid_tensor:", torch.mean(expo(y_valid_tensor)))
+            #     print("mean of y_valid_pred:", torch.mean(expo(y_valid_pred)))
             #
             scheduler.step()
 
@@ -185,7 +189,7 @@ if __name__ == '__main__':
         for i in range(len(y_test_pred)):
             pred_data.loc[(index_info[i][0], index_info[i][1])] = y_test_pred[i]
 
-        # pred_data.to_csv('C:\\Users\ipwx\Desktop\\testing\\pred_data.csv')
+        pred_data.to_csv('C:\\Users\ipwx\Desktop\\testing\\pred_data.csv')
 
     columns_to_keep = ['CLOSE', 'INDUSTRY', 'MARKET_CAP', 'NEXT_RET']
     merged_data = pd.concat([data.loc[:, columns_to_keep], pred_data], axis=1, join='inner')
