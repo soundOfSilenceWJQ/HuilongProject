@@ -36,22 +36,19 @@ class GRUModel(nn.Module):
 
 
 if __name__ == '__main__':
-
+    base_path = 'C:\\Users\ipwx\Desktop\\testing\\'
     # 数据准备
     # 载入因子
     data: pd.DataFrame = pd.read_hdf("C:/Users/ipwx/Desktop/朱/_Alpha158_Financial01_Barra_HT_proceed.hdf")
 
-    # 对'NEXT_RET'列进行+1然后取对数操作
-    data['NEXT_RET_LOG'] = np.log(data['NEXT_RET'] + 1)
+    data['NEXT_RET'] = np.log(data['NEXT_RET'] + 1)
 
-    # 构造截面数据
     dates = data.index.get_level_values('date')
     start_date, end_date = dates.min(), dates.max()
-    logger.info('因子已载入。')
 
     pred_data = pd.Series(index=data.index, name='PRED_NEXT_RET')
 
-    for year in range(2009, 2010):  # 从2009开始滚动，到2022
+    for year in range(2010, 2011):  # 从2009开始滚动，到2022
 
         # 定义滚动窗口
         train_start = date(year, 1, 1)
@@ -74,7 +71,6 @@ if __name__ == '__main__':
         X_test, y_test, _ = get_data_Xy(test_data_df, 'test', factor_cols)
         # 得到snippets
         # 如果没有找到相应文件，就重新生成
-        base_path = 'C:\\Users\ipwx\Desktop\\testing\\'
         if os.path.exists(base_path + '\X_train_tensor' + str(year) + '.pt') == False:
             X_train_tensor = get_snippets(X_train, 3)
             y_train_tensor = get_snippets(y_train, 3)
@@ -90,11 +86,11 @@ if __name__ == '__main__':
             X_valid_tensor = get_snippets(X_valid, 3)
             y_valid_tensor = get_snippets(y_valid, 3)
             y_valid_tensor = y_valid_tensor[:, -1]
-            torch.save(X_valid_tensor, base_path + '\X_valid_tensor.pt')
-            torch.save(y_valid_tensor, base_path + '\y_valid_tensor.pt')
+            torch.save(X_valid_tensor, base_path + '\X_valid_tensor' + str(year) + '.pt')
+            torch.save(y_valid_tensor, base_path + '\y_valid_tensor'  + str(year) + '.pt')
         else:
-            X_valid_tensor = torch.load(base_path + '\X_valid_tensor.pt')
-            y_valid_tensor = torch.load(base_path + '\y_valid_tensor.pt')
+            X_valid_tensor = torch.load(base_path + '\X_valid_tensor'  + str(year) + '.pt')
+            y_valid_tensor = torch.load(base_path + '\y_valid_tensor'  + str(year) + '.pt')
 
         if os.path.exists(base_path + '\X_test_tensor' + str(year) + '.pt') == False:
             X_test_tensor = get_snippets(X_test, 3)
@@ -103,13 +99,13 @@ if __name__ == '__main__':
             y_test_tensor = y_test_tensor[:, -1]
             torch.save(X_test_tensor, base_path + '\X_test_tensor' + str(year) + '.pt')
             torch.save(y_test_tensor, base_path + '\y_test_tensor' + str(year) + '.pt')
-            with open(base_path + 'index_info.pkl', 'wb') as f:
+            with open(base_path + 'index_info' + str(year) + '.pkl', 'wb') as f:
                 pickle.dump(index_info, f)
 
         else:
             X_test_tensor = torch.load(base_path + '\X_test_tensor' + str(year) + '.pt')
             y_test_tensor = torch.load(base_path + '\y_test_tensor' + str(year) + '.pt')
-            with open(base_path + 'index_info.pkl', 'rb') as f:
+            with open(base_path + 'index_info' + str(year) + '.pkl', 'rb') as f:
                 index_info = pickle.load(f)
 
         # 定义GRU模型
@@ -149,23 +145,23 @@ if __name__ == '__main__':
 
             print(f"Epoch {epoch + 1}/{num_epochs}, Training Loss: {loss.item():.4f}")
 
-            # # 衡量在验证集上的性能
-            # with torch.no_grad():
-            #     valid_loss = 0
-            #     for i in tqdm(range(0, len(X_valid_tensor), batch_size), desc=f'Epoch {epoch} valid'):
-            #         # batch_x要是序列数据（前几个月的因子值）
-            #         batch_inputs = X_valid_tensor[i:i + batch_size]
-            #         batch_targets = y_valid_tensor[i:i + batch_size]
-            #         outputs = model(batch_inputs)
-            #         loss = criterion(outputs, batch_targets)
-            #         valid_loss += loss.item()
-            #     print(f"Validation Loss: {valid_loss / len(X_valid_tensor)}")
-            #     y_valid_pred = model(X_valid_tensor)
-            #     print("mae:", torch.mean(torch.abs(expo(y_valid_pred) - expo(y_valid_tensor))))
-            #     print("mean of y_valid_tensor:", torch.mean(expo(y_valid_tensor)))
-            #     print("mean of y_valid_pred:", torch.mean(expo(y_valid_pred)))
+            # 衡量在验证集上的性能
+            with torch.no_grad():
+                valid_loss = 0
+                for i in tqdm(range(0, len(X_valid_tensor), batch_size), desc=f'Epoch {epoch} valid'):
+                    # batch_x要是序列数据（前几个月的因子值）
+                    batch_inputs = X_valid_tensor[i:i + batch_size]
+                    batch_targets = y_valid_tensor[i:i + batch_size]
+                    outputs = model(batch_inputs)
+                    loss = criterion(outputs, batch_targets)
+                    valid_loss += loss.item()
+                print(f"Validation Loss: {valid_loss / len(X_valid_tensor)}")
+                y_valid_pred = model(X_valid_tensor)
+                print("mae:", torch.mean(torch.abs(expo(y_valid_pred) - expo(y_valid_tensor))))
+                print("mean of y_valid_tensor:", torch.mean(expo(y_valid_tensor)))
+                print("mean of y_valid_pred:", torch.mean(expo(y_valid_pred)))
             #
-            # scheduler.step()
+            scheduler.step()
 
         end_time = time.time()
         elapsed_time_minutes = (end_time - start_time) / 60  # 这会给出时间差，以分钟为单位
@@ -176,12 +172,8 @@ if __name__ == '__main__':
         with torch.no_grad():
             model.eval()
             y_train_pred = model(X_train_tensor)
-            # y_train_pred = torch.exp(y_train_pred) - 1
-            # 计算MSE Loss
             print("total train mae:", torch.mean(torch.abs(torch.exp(y_train_pred) - torch.exp(y_train_tensor))))
 
-
-        # 测试模型
         with torch.no_grad():
             model.eval()
             y_test_pred = model(X_test_tensor)
@@ -195,67 +187,21 @@ if __name__ == '__main__':
 
         # pred_data.to_csv('C:\\Users\ipwx\Desktop\\testing\\pred_data.csv')
 
-        columns_to_keep = ['CLOSE', 'INDUSTRY', 'MARKET_CAP', 'NEXT_RET']
-        merged_data = pd.concat([data.loc[:, columns_to_keep], pred_data], axis=1, join='inner')
-        filtered_data = merged_data.dropna(how='any')
+    columns_to_keep = ['CLOSE', 'INDUSTRY', 'MARKET_CAP', 'NEXT_RET']
+    merged_data = pd.concat([data.loc[:, columns_to_keep], pred_data], axis=1, join='inner')
+    filtered_data = merged_data.dropna(how='any')
 
-        # 载入行业
-        loader = StockDataLoaderV2(start_date=start_date, end_date=end_date)
-        indmap = loader.load_industry_mapping()
+    # 载入行业
+    loader = StockDataLoaderV2(start_date=start_date, end_date=end_date)
+    indmap = loader.load_industry_mapping()
 
-        ctx = easy_factor_test(
-            factor=pred_data,
-            stock_data=filtered_data,
-            industry_mapping=indmap,
-            use_preprocessing=False,
-        )
-        print(ctx)
-        ctx.show()
+    ctx = easy_factor_test(
+        factor=pred_data,
+        stock_data=filtered_data,
+        industry_mapping=indmap,
+        use_preprocessing=False,
+    )
+    print(ctx)
+    ctx.show()
 
-    # index_df = pd.DataFrame(fac.index.tolist(), columns=['date', 'stock'])
-    # start_date_filter = datetime(2020, 1, 1).date()
-    # end_date_filter = datetime(2023, 6, 1).date()
-    # filtered_indices = index_df[
-    #     (index_df['date'] >= start_date_filter) &
-    #     (index_df['date'] <= end_date_filter)
-    #     ].index
-    #
-    # fac_filtered = fac.iloc[filtered_indices]
-    # # Reset index to MultiIndex with proper names
-    # fac_filtered.index = pd.MultiIndex.from_tuples(
-    #     fac_filtered.index.tolist(),
-    #     names=['date', 'symbol']
-    # )
-    #
-    # # 首先，将 'date' 索引级别的日期字符串转换为 datetime.date 对象
-    # new_levels = pd.to_datetime(data.index.levels[0], format='%Y-%m-%d').date
-    # data.index =data.index.set_levels(new_levels, level='date')
-    #
-    # # 定义开始日期和结束日期
-    # start_date = datetime.strptime('2020-01-01', '%Y-%m-%d').date()
-    # end_date = datetime.strptime('2023-06-01', '%Y-%m-%d').date()
-    #
-    # # 使用多级索引的日期进行筛选
-    # data_filtered =data[(data.index.get_level_values('date') >= start_date) & (data.index.get_level_values('date') <= end_date)]
-    #
-    # print('切割后的原始300数据是',data_filtered)
-    #
-    # # 选择要保留的列
-    # columns_to_keep = ['CLOSE', 'INDUSTRY', 'MARKET_CAP', 'NEXT_RET']
-    #
-    # # 使用loc选择这些列并保留索引列
-    # filtered_data = data_filtered.loc[:, columns_to_keep]
-    # print('filtered_data',filtered_data)
-    #
-    # # 载入行业
-    # loader = StockDataLoaderV2(start_date=start_date, end_date=end_date)
-    # indmap = loader.load_industry_mapping()
-    #
-    # ctx = easy_factor_test(
-    #     factor=fac_filtered,
-    #     stock_data=filtered_data,
-    #     industry_mapping=indmap,
-    #     use_preprocessing=False,
-    # )
-    # print(ctx)
-    # ctx.show()
+

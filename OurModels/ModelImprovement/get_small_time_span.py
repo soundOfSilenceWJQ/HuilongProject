@@ -14,7 +14,7 @@ def get_snippets(data: pd.DataFrame, TN=3, is_index_info_needed=False):
 
     for i in range(len(dates) - TN):
         start_date = dates[i]
-        print(start_date)
+        print("{} has loaded.".format(start_date))
         end_date = dates[i + TN - 1]
         data_snippet = data[(data.index.get_level_values('date') >= start_date) & (data.index.get_level_values('date') <= end_date)]
         for symbol in symbols:
