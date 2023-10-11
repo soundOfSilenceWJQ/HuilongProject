@@ -18,43 +18,8 @@ from tqdm import tqdm
 from get_small_time_span import get_snippets
 import pickle
 
+from util import expo, log, get_data_Xy
 
-def get_data_Xy(df, tag, factor_cols=None):
-    # 抽取有效的列
-    if factor_cols is None:
-        # 在训练集中只采纳有效的列
-        df = extract_factor_columns(df, extra=['INDUSTRY', 'NEXT_RET'])
-        factor_cols = [
-            col for col in df.columns
-            if (col not in ('INDUSTRY', 'NEXT_RET')) and (df[col].isna().sum() == 0)
-        ]
-    else:
-        # 在测试集中如果对应存在无效列，则表明 cs_fill_nan 失败，只能填充
-        factor_cols = list(factor_cols)
-        df = df[factor_cols + ['INDUSTRY', 'NEXT_RET']]
-        for col in factor_cols:
-            na_sum = df[col].isna().sum()
-            if na_sum > 0:
-                logger.warning(f'在 {tag!r} 中，所需因子列 {col!r} 存在空值，只能填充为中值或 0。')
-                if na_sum < len(df[col]):
-                    col_val = df[col].fillna(df[col].median())
-                else:
-                    col_val = 0
-                df = df.assign(**{col: col_val})
-
-    # 抽取非 NaN 的行（主要针对 NEXT_RET）
-    df = df[factor_cols + ['INDUSTRY', 'NEXT_RET']]
-    df = df.dropna(how='any')
-
-    # 抽取 X 和 y
-    X = extract_factor_columns(df)
-    y = cs_clip_extreme(
-        df[['NEXT_RET']],
-        columns=['NEXT_RET'],
-    )['NEXT_RET']
-
-    # 返回数据
-    return X, y, factor_cols
 
 
 # 模型定义
@@ -77,7 +42,7 @@ if __name__ == '__main__':
     data: pd.DataFrame = pd.read_hdf("C:/Users/ipwx/Desktop/朱/_Alpha158_Financial01_Barra_HT_proceed.hdf")
 
     # 对'NEXT_RET'列进行+1然后取对数操作
-    data['NEXT_RET'] = np.log(data['NEXT_RET'] + 1)
+    data['NEXT_RET_LOG'] = np.log(data['NEXT_RET'] + 1)
 
     # 构造截面数据
     dates = data.index.get_level_values('date')
@@ -148,12 +113,12 @@ if __name__ == '__main__':
                 index_info = pickle.load(f)
 
         # 定义GRU模型
-        batch_size = 64
+        batch_size = 256
         input_size = len(factor_cols)  # 根据训练数据更新input_size
         hidden_size = 256
         num_layers = 2
         dropout = 0.2
-        num_epochs = 15
+        num_epochs = 1
 
         model = GRUModel(input_size, hidden_size, num_layers, dropout)
         criterion = nn.MSELoss()
@@ -182,22 +147,25 @@ if __name__ == '__main__':
                 # print('batch targets mean:', torch.mean(batch_targets))
                 # print('batch outputs mean:', torch.mean(outputs))
 
-            print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss.item():.4f}")
+            print(f"Epoch {epoch + 1}/{num_epochs}, Training Loss: {loss.item():.4f}")
 
-            # 衡量在验证集上的性能
-            with torch.no_grad():
-                valid_loss = 0
-                for i in tqdm(range(0, len(X_valid_tensor), batch_size), desc=f'Epoch {epoch} valid'):
-                    # batch_x要是序列数据（前几个月的因子值）
-                    batch_inputs = X_valid_tensor[i:i + batch_size]
-                    batch_targets = y_valid_tensor[i:i + batch_size]
-                    outputs = model(batch_inputs)
-                    loss = criterion(outputs, batch_targets)
-                    valid_loss += loss.item()
-            print(f"Year: {year}, Epoch: {epoch + 1}/{num_epochs}, Validation Loss: {valid_loss / len(X_valid_tensor)}")
-            print("mae:", torch.mean(torch.abs(model(X_valid_tensor) - y_valid_tensor)))
-
-            scheduler.step()
+            # # 衡量在验证集上的性能
+            # with torch.no_grad():
+            #     valid_loss = 0
+            #     for i in tqdm(range(0, len(X_valid_tensor), batch_size), desc=f'Epoch {epoch} valid'):
+            #         # batch_x要是序列数据（前几个月的因子值）
+            #         batch_inputs = X_valid_tensor[i:i + batch_size]
+            #         batch_targets = y_valid_tensor[i:i + batch_size]
+            #         outputs = model(batch_inputs)
+            #         loss = criterion(outputs, batch_targets)
+            #         valid_loss += loss.item()
+            #     print(f"Validation Loss: {valid_loss / len(X_valid_tensor)}")
+            #     y_valid_pred = model(X_valid_tensor)
+            #     print("mae:", torch.mean(torch.abs(expo(y_valid_pred) - expo(y_valid_tensor))))
+            #     print("mean of y_valid_tensor:", torch.mean(expo(y_valid_tensor)))
+            #     print("mean of y_valid_pred:", torch.mean(expo(y_valid_pred)))
+            #
+            # scheduler.step()
 
         end_time = time.time()
         elapsed_time_minutes = (end_time - start_time) / 60  # 这会给出时间差，以分钟为单位
@@ -210,21 +178,16 @@ if __name__ == '__main__':
             y_train_pred = model(X_train_tensor)
             # y_train_pred = torch.exp(y_train_pred) - 1
             # 计算MSE Loss
-            print("mae:", torch.mean(torch.abs(y_train_pred - y_train_tensor)))
+            print("total train mae:", torch.mean(torch.abs(torch.exp(y_train_pred) - torch.exp(y_train_tensor))))
 
 
         # 测试模型
         with torch.no_grad():
             model.eval()
             y_test_pred = model(X_test_tensor)
-            # y_test_pred = torch.exp(y_test_pred) - 1
-            # 计算MSE Loss
-            print("mae:", torch.mean(torch.abs(y_test_pred - y_test_tensor)))
-            loss = criterion(y_test_pred, y_test_tensor)
-            # 计算y_test_pred与y_test_tensor之间的MAE Loss
-            mae_loss = nn.L1Loss()(y_test_pred, y_test_tensor)
-            print(f"Year: {year}, Epoch: {epoch + 1}/{num_epochs}, Test Loss: {loss.item()}, Test MAE Loss: {mae_loss.item()}")
+            print("test mae:", torch.mean(torch.abs(torch.exp(y_test_pred) - torch.exp(y_test_tensor))))
 
+        y_test_pred = expo(y_test_pred)
         y_test_pred = y_test_pred.cpu().numpy()
         # 遍历y_test_pred，将其填入new_data中
         for i in range(len(y_test_pred)):
