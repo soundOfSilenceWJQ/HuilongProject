@@ -15,7 +15,7 @@ import gc
 from torch.optim.lr_scheduler import MultiStepLR
 from tqdm import tqdm
 
-from get_small_time_span import get_snippets
+from data_preparation import get_snippets
 import pickle
 
 from util import expo, log, get_data_Xy

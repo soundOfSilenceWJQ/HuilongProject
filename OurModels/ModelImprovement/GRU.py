@@ -15,7 +15,7 @@ import gc
 from torch.optim.lr_scheduler import MultiStepLR
 from tqdm import tqdm
 
-from get_small_time_span import get_snippets
+from data_preparation import get_snippets
 import pickle
 
 from util import expo, log, get_data_Xy
@@ -36,6 +36,16 @@ class GRUModel(nn.Module):
 
 
 if __name__ == '__main__':
+    # 一些训练参数：
+    training_time_span = 9
+    valid_time_span = 1
+    testing_time_span = 1
+    batch_size = 256
+    input_size = 246  # 根据训练数据更新input_size
+    hidden_size = 256
+    num_layers = 2
+    dropout = 0.2
+    num_epochs = 1
     base_path = 'C:\\Users\ipwx\Desktop\\testing\\'
     # 数据准备
     # 载入因子
@@ -48,18 +58,18 @@ if __name__ == '__main__':
 
     pred_data = pd.Series(index=data.index, name='PRED_NEXT_RET')
 
-    for year in range(2009, 2012):  # 从2009开始滚动，到2022
+    for year in range(2009, 2010):  # 从2009开始滚动，到2022
 
         # 定义滚动窗口
         train_start = date(year, 1, 1)
-        train_end = date(year + 9, 12, 31)
-        valid_start = date(year + 10, 1, 1)
-        valid_end = date(year + 10, 12, 31)
-        test_start = date(year + 11, 1, 1)
+        train_end = date(year + training_time_span - 1, 12, 31)
+        valid_start = date(year + training_time_span, 1, 1)
+        valid_end = date(year + training_time_span + valid_time_span - 1, 12, 31)
+        test_start = date(year + training_time_span + valid_time_span, 1, 1)
         if year == 2012:
             test_end = date(2023, 6, 1)
         else:
-            test_end = date(year + 11, 12, 31)
+            test_end = date(year + training_time_span + valid_time_span + testing_time_span - 1, 12, 31)
 
         # 根据滚动窗口划分数据集
         train_data_df = data[(dates >= train_start) & (dates < train_end)]
@@ -108,13 +118,13 @@ if __name__ == '__main__':
             with open(base_path + 'index_info' + str(year) + '.pkl', 'rb') as f:
                 index_info = pickle.load(f)
 
-        # 定义GRU模型
-        batch_size = 256
-        input_size = len(factor_cols)  # 根据训练数据更新input_size
-        hidden_size = 256
-        num_layers = 2
-        dropout = 0.2
-        num_epochs = 1
+        # 检查生成的片段是否有问题
+        for i in range(len(y_test_tensor)):
+            pred_data.loc[(index_info[i][0], index_info[i][1])] = y_test_tensor[i]
+
+        columns_to_keep = ['CLOSE', 'INDUSTRY', 'MARKET_CAP', 'NEXT_RET']
+        merged_data = pd.concat([data.loc[:, columns_to_keep], pred_data], axis=1, join='inner')
+
 
         model = GRUModel(input_size, hidden_size, num_layers, dropout)
         criterion = nn.MSELoss()
@@ -129,6 +139,8 @@ if __name__ == '__main__':
         logger.info(f"Training model for {year}...")
 
         for epoch in range(num_epochs):
+            model.train()
+            running_loss = 0
             for i in tqdm(range(0, len(X_train_tensor), batch_size), desc=f'Epoch {epoch} train'):
                 optimizer.zero_grad()
                 batch_inputs = X_train_tensor[i:i + batch_size]
@@ -136,9 +148,9 @@ if __name__ == '__main__':
 
                 outputs = model(batch_inputs)
                 loss = criterion(outputs, batch_targets)
-
                 loss.backward()
                 optimizer.step()
+                running_loss += loss.item()
                 # print('batch mae: ', torch.mean(torch.abs(outputs - batch_targets)))
                 # print('batch targets mean:', torch.mean(batch_targets))
                 # print('batch outputs mean:', torch.mean(outputs))
@@ -147,7 +159,7 @@ if __name__ == '__main__':
             # print("mean of y_train_tensor:", torch.mean(expo(y_train_tensor)))
             # print("mean of y_train_pred:", torch.mean(expo(y_train_pred)))
 
-            print(f"Epoch {epoch + 1}/{num_epochs}, Training Loss: {loss.item():.4f}")
+            print(f"Epoch {epoch + 1}/{num_epochs}, Training Loss: {running_loss / batch_size:.4f}")
 
             # # 衡量在验证集上的性能
             # with torch.no_grad():
@@ -168,7 +180,7 @@ if __name__ == '__main__':
             scheduler.step()
 
         end_time = time.time()
-        elapsed_time_minutes = (end_time - start_time) / 60  # 这会给出时间差，以分钟为单位
+        elapsed_time_minutes = (end_time - start_time) / 60
 
         print(f"模型运行时间为: {elapsed_time_minutes:.2f} 分钟")
 
@@ -176,12 +188,16 @@ if __name__ == '__main__':
         with torch.no_grad():
             model.eval()
             y_train_pred = model(X_train_tensor)
-            print("total train mae:", torch.mean(torch.abs(torch.exp(y_train_pred) - torch.exp(y_train_tensor))))
+            print("total train mae:", torch.mean(torch.abs(expo(y_train_pred) - expo(y_train_tensor))))
+            print("train target mean:", torch.mean(expo(y_train_tensor)))
+            print("train pred mean:", torch.mean(expo(y_train_pred)))
 
         with torch.no_grad():
             model.eval()
             y_test_pred = model(X_test_tensor)
-            print("test mae:", torch.mean(torch.abs(torch.exp(y_test_pred) - torch.exp(y_test_tensor))))
+            print("test mae:", torch.mean(torch.abs(expo(y_test_pred) - expo(y_test_tensor))))
+            print("test target mean:", torch.mean(expo(y_test_tensor)))
+            print("test pred mean:", torch.mean(expo(y_test_pred)))
 
         y_test_pred = expo(y_test_pred)
         y_test_pred = y_test_pred.cpu().numpy()
@@ -189,10 +205,11 @@ if __name__ == '__main__':
         for i in range(len(y_test_pred)):
             pred_data.loc[(index_info[i][0], index_info[i][1])] = y_test_pred[i]
 
-        pred_data.to_csv('C:\\Users\ipwx\Desktop\\testing\\pred_data.csv')
+
 
     columns_to_keep = ['CLOSE', 'INDUSTRY', 'MARKET_CAP', 'NEXT_RET']
     merged_data = pd.concat([data.loc[:, columns_to_keep], pred_data], axis=1, join='inner')
+
     filtered_data = merged_data.dropna(how='any')
 
     # 载入行业

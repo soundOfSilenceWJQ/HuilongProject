@@ -3,20 +3,7 @@ from datetime import date, datetime
 import pandas as pd
 import numpy as np
 from loguru import logger
-from quant_stock.backtest import easy_factor_test
-from quant_stock.core import StockDataLoaderV2
 from quant_stock.pipeline import *
-import torch
-import torch.nn as nn
-from torch.optim import Adam
-from torch.utils.data import DataLoader, TensorDataset
-import time
-import gc
-from torch.optim.lr_scheduler import MultiStepLR
-from tqdm import tqdm
-
-from get_small_time_span import get_snippets
-import pickle
 
 def expo(x):
     return np.exp(x) - 1
