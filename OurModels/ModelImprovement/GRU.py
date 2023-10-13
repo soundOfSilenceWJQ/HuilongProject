@@ -15,7 +15,7 @@ import gc
 from torch.optim.lr_scheduler import MultiStepLR
 from tqdm import tqdm
 
-from data_preparation import get_snippets
+from data_preparation import get_snippets, load_snippets
 import pickle
 
 from util import expo, log, get_data_Xy
@@ -37,21 +37,24 @@ class GRUModel(nn.Module):
 
 if __name__ == '__main__':
     # 一些训练参数：
-    training_time_span = 9
-    valid_time_span = 1
-    testing_time_span = 1
-    batch_size = 256
-    input_size = 246  # 根据训练数据更新input_size
-    hidden_size = 256
-    num_layers = 2
-    dropout = 0.2
-    num_epochs = 1
-    base_path = 'C:\\Users\ipwx\Desktop\\testing\\'
+    class config:
+        training_time_span = 9
+        valid_time_span = 1
+        testing_time_span = 1
+        batch_size = 256
+        input_size = 246  # 根据训练数据更新input_size
+        hidden_size = 256
+        num_layers = 2
+        dropout = 0.2
+        num_epochs = 1
+        base_path = 'C:\\Users\\ipwx\\Desktop\\testing\\'
     # 数据准备
     # 载入因子
-    data: pd.DataFrame = pd.read_hdf("C:/Users/ipwx/Desktop/朱/_Alpha158_Financial01_Barra_HT_proceed.hdf")
+    data: pd.DataFrame = pd.read_hdf(base_path + "_Alpha158_Financial01_Barra_HT_proceed.hdf")
 
     data['NEXT_RET'] = np.log(data['NEXT_RET'] + 1)
+
+    a, b, c = load_snippets([2009], 'C:\\Users\\ipwx\\Desktop\\testing\\')
 
     dates = data.index.get_level_values('date')
     start_date, end_date = dates.min(), dates.max()
@@ -59,7 +62,6 @@ if __name__ == '__main__':
     pred_data = pd.Series(index=data.index, name='PRED_NEXT_RET')
 
     for year in range(2009, 2010):  # 从2009开始滚动，到2022
-
         # 定义滚动窗口
         train_start = date(year, 1, 1)
         train_end = date(year + training_time_span - 1, 12, 31)
@@ -81,7 +83,7 @@ if __name__ == '__main__':
         X_test, y_test, _ = get_data_Xy(test_data_df, 'test', factor_cols)
         # 得到snippets
         # 如果没有找到相应文件，就重新生成
-        if os.path.exists(base_path + '\X_train_tensor' + str(year) + '.pt') == False:
+        if not os.path.exists(base_path + '\\X_train_tensor' + str(year) + '.pt'):
             X_train_tensor = get_snippets(X_train, 3)
             y_train_tensor = get_snippets(y_train, 3)
             y_train_tensor = y_train_tensor[:, -1]
@@ -117,14 +119,6 @@ if __name__ == '__main__':
             y_test_tensor = torch.load(base_path + '\y_test_tensor' + str(year) + '.pt')
             with open(base_path + 'index_info' + str(year) + '.pkl', 'rb') as f:
                 index_info = pickle.load(f)
-
-        # 检查生成的片段是否有问题
-        for i in range(len(y_test_tensor)):
-            pred_data.loc[(index_info[i][0], index_info[i][1])] = y_test_tensor[i]
-
-        columns_to_keep = ['CLOSE', 'INDUSTRY', 'MARKET_CAP', 'NEXT_RET']
-        merged_data = pd.concat([data.loc[:, columns_to_keep], pred_data], axis=1, join='inner')
-
 
         model = GRUModel(input_size, hidden_size, num_layers, dropout)
         criterion = nn.MSELoss()
