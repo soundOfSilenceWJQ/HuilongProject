@@ -2,7 +2,7 @@
 import pickle
 import os
 from datetime import date
-
+from quant_stock.pipeline import extract_factor_columns
 import pandas as pd
 import numpy as np
 import torch
@@ -51,11 +51,13 @@ def get_snippets_for_a_year(df: pd.DataFrame, year, TN, base_path):
     new_start_date = new_start_date.date()
     end_date = date(year, 12, 31)
     sub_df = df[(df.index.get_level_values('date') >= new_start_date) & (df.index.get_level_values('date') <= end_date)]
-    data_X, data_y, _ = get_data_Xy(sub_df, str(year))
+    # data_X, data_y, _ = get_data_Xy(sub_df, str(year))
+    data_X = extract_factor_columns(data=sub_df, pattern='Alpha.*')
+    data_y = sub_df['NEXT_RET']
     snip_tensor_x, index_info = get_snippets(data_X, TN, True)
     snip_tensor_y = get_snippets(data_y, TN, False)
     tensor_y = snip_tensor_y[:, -1]
-    path = base_path + '\\' + str(year)
+    path = base_path + '\\' + 'TN=' + str(TN) + '\\' + str(year)
     if not os.path.exists(path):
         os.makedirs(path)
     torch.save(snip_tensor_x, path + '\\snip_tensor_X.pt')
@@ -65,13 +67,14 @@ def get_snippets_for_a_year(df: pd.DataFrame, year, TN, base_path):
         pickle.dump(index_info, f)
     return
 
-def load_snippets(year_list, base_path):
+
+def load_snippets(year_list, base_path, TN):
     '''从本地加载时间片段的数据'''
     snip_tensor_list = []
     tensor_y_list = []
     index_info_list = []
     for year in year_list:
-        path = base_path + '\\' + str(year)
+        path = base_path + '\\TN=' + str(TN) + '\\' + str(year)
         snip_tensor_list.append(torch.load(path + '\\snip_tensor_X.pt'))
         tensor_y_list.append(torch.load(path + '\\tensor_y.pt'))
         with open(path + '\\index_info.pkl', 'rb') as f:
@@ -80,12 +83,14 @@ def load_snippets(year_list, base_path):
     tensor_y = torch.cat(tensor_y_list)
     return snip_tensor, tensor_y, index_info_list
 
+
 if __name__ == '__main__':
-    data: pd.DataFrame = pd.read_hdf("C:/Users/ipwx/Desktop/朱/_Alpha158_Financial01_Barra_HT_proceed.hdf")
-    for year in range(2009, 2022):
-        get_snippets_for_a_year(data, year, 3, 'C:\\Users\\ipwx\\Desktop\\testing\\')
+    # data: pd.DataFrame = pd.read_hdf("C:/Users/ipwx/Desktop/朱/_Alpha158_Financial01_Barra_HT_proceed.hdf")
+    # for year in range(2009, 2022):
+    #     get_snippets_for_a_year(data, year, 3, 'C:\\Users\\ipwx\\Desktop\\testing\\')
     # get_snippets_for_a_year(data, 2009, 3, 'C:\\Users\\ipwx\\Desktop\\testing\\')
-    # a, b, c = load_snippets([2009], 'C:\\Users\\ipwx\\Desktop\\testing\\')
+    a, b, c = load_snippets([year for year in range(2009, 2022)], 'C:\\Users\\ipwx\\Desktop\\testing\\', 3)
+    pass
     # dates = data.index.get_level_values('date')
     # symbol = data.index.get_level_values('symbol')
     # nr = data.loc[(dates == date(2009, 1, 23)) & (symbol == '000001.XSHE')]

@@ -38,8 +38,9 @@ class GRUModel(nn.Module):
 if __name__ == '__main__':
     # 一些训练参数：
     class config:
-        training_time_span = 9
-        valid_time_span = 1
+        TN = 3
+        training_time_span = 10
+        valid_time_span = 0
         testing_time_span = 1
         batch_size = 256
         input_size = 246  # 根据训练数据更新input_size
@@ -50,9 +51,7 @@ if __name__ == '__main__':
         base_path = 'C:\\Users\\ipwx\\Desktop\\testing\\'
     # 数据准备
     # 载入因子
-    data: pd.DataFrame = pd.read_hdf(base_path + "_Alpha158_Financial01_Barra_HT_proceed.hdf")
-
-    data['NEXT_RET'] = np.log(data['NEXT_RET'] + 1)
+    data: pd.DataFrame = pd.read_hdf(config.base_path + "_Alpha158_Financial01_Barra_HT_proceed.hdf")
 
     a, b, c = load_snippets([2009], 'C:\\Users\\ipwx\\Desktop\\testing\\')
 
@@ -63,64 +62,14 @@ if __name__ == '__main__':
 
     for year in range(2009, 2010):  # 从2009开始滚动，到2022
         # 定义滚动窗口
-        train_start = date(year, 1, 1)
-        train_end = date(year + training_time_span - 1, 12, 31)
-        valid_start = date(year + training_time_span, 1, 1)
-        valid_end = date(year + training_time_span + valid_time_span - 1, 12, 31)
-        test_start = date(year + training_time_span + valid_time_span, 1, 1)
-        if year == 2012:
-            test_end = date(2023, 6, 1)
-        else:
-            test_end = date(year + training_time_span + valid_time_span + testing_time_span - 1, 12, 31)
+        train_year_list = [year + i for i in range(config.training_time_span)]
+        valid_year_list = [year + config.training_time_span + i for i in range(config.valid_time_span)]
+        test_year_list = [year + config.training_time_span + config.valid_time_span + i for i in range(config.testing_time_span)]
+        train_X, train_y, _ = load_snippets(train_year_list, config.base_path, config.TN)
+        valid_X, valid_y, _ = load_snippets(valid_year_list, config.base_path, config.TN)
+        test_X, test_y, index_info = load_snippets(test_year_list, config.base_path, config.TN)
 
-        # 根据滚动窗口划分数据集
-        train_data_df = data[(dates >= train_start) & (dates < train_end)]
-        valid_data_df = data[(dates >= valid_start) & (dates < valid_end)]
-        test_data_df = data[(dates >= test_start) & (dates < test_end)]
-
-        X_train, y_train, factor_cols = get_data_Xy(train_data_df, 'train')
-        X_valid, y_valid, _ = get_data_Xy(valid_data_df, 'valid', factor_cols)
-        X_test, y_test, _ = get_data_Xy(test_data_df, 'test', factor_cols)
-        # 得到snippets
-        # 如果没有找到相应文件，就重新生成
-        if not os.path.exists(base_path + '\\X_train_tensor' + str(year) + '.pt'):
-            X_train_tensor = get_snippets(X_train, 3)
-            y_train_tensor = get_snippets(y_train, 3)
-            y_train_tensor = y_train_tensor[:, -1]
-            torch.save(X_train_tensor, base_path + '\X_train_tensor' + str(year) + '.pt')
-            torch.save(y_train_tensor, base_path + '\y_train_tensor' + str(year) + '.pt')
-
-        else:
-            X_train_tensor = torch.load(base_path + '\X_train_tensor' + str(year) + '.pt')
-            y_train_tensor = torch.load(base_path + '\y_train_tensor' + str(year) + '.pt')
-
-        if os.path.exists(base_path + '\X_valid_tensor' + str(year) + '.pt') == False:
-            X_valid_tensor = get_snippets(X_valid, 3)
-            y_valid_tensor = get_snippets(y_valid, 3)
-            y_valid_tensor = y_valid_tensor[:, -1]
-            torch.save(X_valid_tensor, base_path + '\X_valid_tensor' + str(year) + '.pt')
-            torch.save(y_valid_tensor, base_path + '\y_valid_tensor'  + str(year) + '.pt')
-        else:
-            X_valid_tensor = torch.load(base_path + '\X_valid_tensor'  + str(year) + '.pt')
-            y_valid_tensor = torch.load(base_path + '\y_valid_tensor'  + str(year) + '.pt')
-
-        if os.path.exists(base_path + '\X_test_tensor' + str(year) + '.pt') == False:
-            X_test_tensor = get_snippets(X_test, 3)
-            y_test_tensor, index_info = get_snippets(y_test, 3, True)
-
-            y_test_tensor = y_test_tensor[:, -1]
-            torch.save(X_test_tensor, base_path + '\X_test_tensor' + str(year) + '.pt')
-            torch.save(y_test_tensor, base_path + '\y_test_tensor' + str(year) + '.pt')
-            with open(base_path + 'index_info' + str(year) + '.pkl', 'wb') as f:
-                pickle.dump(index_info, f)
-
-        else:
-            X_test_tensor = torch.load(base_path + '\X_test_tensor' + str(year) + '.pt')
-            y_test_tensor = torch.load(base_path + '\y_test_tensor' + str(year) + '.pt')
-            with open(base_path + 'index_info' + str(year) + '.pkl', 'rb') as f:
-                index_info = pickle.load(f)
-
-        model = GRUModel(input_size, hidden_size, num_layers, dropout)
+        model = GRUModel(config.input_size, config.hidden_size, config.num_layers, config.dropout)
         criterion = nn.MSELoss()
         optimizer = Adam(model.parameters(), lr=0.01)  # 初始化时的学习率设置为0.01
 
@@ -132,13 +81,13 @@ if __name__ == '__main__':
 
         logger.info(f"Training model for {year}...")
 
-        for epoch in range(num_epochs):
+        for epoch in range(config.num_epochs):
             model.train()
             running_loss = 0
-            for i in tqdm(range(0, len(X_train_tensor), batch_size), desc=f'Epoch {epoch} train'):
+            for i in tqdm(range(0, len(train_X), config.batch_size), desc=f'Epoch {epoch} train'):
                 optimizer.zero_grad()
-                batch_inputs = X_train_tensor[i:i + batch_size]
-                batch_targets = y_train_tensor[i:i + batch_size]
+                batch_inputs = train_X[i:i + config.batch_size]
+                batch_targets = train_y[i:i + config.batch_size]
 
                 outputs = model(batch_inputs)
                 loss = criterion(outputs, batch_targets)
@@ -148,12 +97,12 @@ if __name__ == '__main__':
                 # print('batch mae: ', torch.mean(torch.abs(outputs - batch_targets)))
                 # print('batch targets mean:', torch.mean(batch_targets))
                 # print('batch outputs mean:', torch.mean(outputs))
-            # y_train_pred = model(X_train_tensor)
+            # y_train_pred = model(train_X)
             # print("mae:", torch.mean(torch.abs(expo(y_train_pred) - expo(y_valid_tensor))))
-            # print("mean of y_train_tensor:", torch.mean(expo(y_train_tensor)))
+            # print("mean of train_y:", torch.mean(expo(train_y)))
             # print("mean of y_train_pred:", torch.mean(expo(y_train_pred)))
 
-            print(f"Epoch {epoch + 1}/{num_epochs}, Training Loss: {running_loss / batch_size:.4f}")
+            print(f"Epoch {epoch + 1}/{config.num_epochs}, Training Loss: {running_loss / config.batch_size:.4f}")
 
             # # 衡量在验证集上的性能
             # with torch.no_grad():
@@ -181,19 +130,19 @@ if __name__ == '__main__':
         # 测试模型
         with torch.no_grad():
             model.eval()
-            y_train_pred = model(X_train_tensor)
-            print("total train mae:", torch.mean(torch.abs(expo(y_train_pred) - expo(y_train_tensor))))
-            print("train target mean:", torch.mean(expo(y_train_tensor)))
+            y_train_pred = model(train_X)
+            print("total train mae:", torch.mean(torch.abs(expo(y_train_pred) - expo(train_y))))
+            print("train target mean:", torch.mean(expo(train_y)))
             print("train pred mean:", torch.mean(expo(y_train_pred)))
 
         with torch.no_grad():
             model.eval()
-            y_test_pred = model(X_test_tensor)
-            print("test mae:", torch.mean(torch.abs(expo(y_test_pred) - expo(y_test_tensor))))
-            print("test target mean:", torch.mean(expo(y_test_tensor)))
-            print("test pred mean:", torch.mean(expo(y_test_pred)))
+            test_y_pred = model(test_X)
+            print("test mae:", torch.mean(torch.abs(expo(test_y_pred) - expo(test_y))))
+            print("test target mean:", torch.mean(expo(test_y)))
+            print("test pred mean:", torch.mean(expo(test_y_pred)))
 
-        y_test_pred = expo(y_test_pred)
+        y_test_pred = expo(test_y_pred)
         y_test_pred = y_test_pred.cpu().numpy()
         # 遍历y_test_pred，将其填入new_data中
         for i in range(len(y_test_pred)):
