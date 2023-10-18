@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader, TensorDataset
 import time
 import gc
 from torch.optim.lr_scheduler import MultiStepLR
+from small_test import give_serial_data
 
 # 模型定义
 class GRUModel(nn.Module):
@@ -30,15 +31,15 @@ if __name__ == '__main__':
     data1: pd.DataFrame = pd.read_hdf('C:/Users/ipwx/Desktop/朱/_Alpha158_Financial01_Barra_HT_proceed.hdf')
     print(data1.NEXT_RET)
 
-    # Step 1: 计算每个日期每个行业的平均收益率
-    industry_daily_mean_returns = data1.groupby(['date', 'INDUSTRY'])['NEXT_RET'].mean()
-    print('industry_daily_mean_returns',industry_daily_mean_returns)
-    # Step 2: 从每只股票的收益率中减去其行业的当天平均收益率
-    def subtract_daily_industry_mean(row):
-        return industry_daily_mean_returns.loc[row.name[0], row['INDUSTRY']]
-    # 使用`apply`函数并按行(axis=1)应用上面的函数
-    data1['NEXT_RET'] = data1['NEXT_RET'] - data1.apply(subtract_daily_industry_mean, axis=1)
-    print('截面中性化完的收益率',data1.NEXT_RET)
+    # # Step 1: 计算每个日期每个行业的平均收益率
+    # industry_daily_mean_returns = data1.groupby(['date', 'INDUSTRY'])['NEXT_RET'].mean()
+    # print('industry_daily_mean_returns',industry_daily_mean_returns)
+    # # Step 2: 从每只股票的收益率中减去其行业的当天平均收益率
+    # def subtract_daily_industry_mean(row):
+    #     return industry_daily_mean_returns.loc[row.name[0], row['INDUSTRY']]
+    # # 使用`apply`函数并按行(axis=1)应用上面的函数
+    # data1['NEXT_RET'] = data1['NEXT_RET'] - data1.apply(subtract_daily_industry_mean, axis=1)
+    # print('截面中性化完的收益率',data1.NEXT_RET)
 
     # 对'NEXT_RET'列进行+1然后取对数操作
     data1['NEXT_RET'] = np.log(data1['NEXT_RET'] + 1)
@@ -97,7 +98,7 @@ if __name__ == '__main__':
     num_layers = 2
     dropout = 0.2
     batch_size = 256
-    num_epochs = 30
+    num_epochs = 1
 
     # 开始统计模型运行时间
     start_time = time.time()
@@ -133,8 +134,11 @@ if __name__ == '__main__':
         input_size = len(factor_cols)  # 根据训练数据更新input_size
 
         # 转换为 PyTorch tensor
-        X_train_tensor = torch.FloatTensor(X_train.values).unsqueeze(1)  # [batch, seq_len, input_size]
-        y_train_tensor = torch.FloatTensor(y_train.values)
+        new_X_train = give_serial_data(X_train)
+        X_train_tensor = torch.FloatTensor(new_X_train.values).unsqueeze(1)  # [batch, seq_len, input_size]
+        # 这里需要改变X_train_tensor
+        new_y_train = give_serial_data(y_train)
+        y_train_tensor = torch.FloatTensor(new_y_train.values)
         X_valid_tensor = torch.FloatTensor(X_valid.values).unsqueeze(1)
         y_valid_tensor = torch.FloatTensor(y_valid.values)
 
@@ -154,6 +158,7 @@ if __name__ == '__main__':
 
         # 训练模型
         for epoch in range(num_epochs):
+            training_loss = 0
             model.train()
             for batch_x, batch_y in train_loader:
                 optimizer.zero_grad()
@@ -161,11 +166,11 @@ if __name__ == '__main__':
                 loss = criterion(outputs, batch_y)
                 loss.backward()
                 optimizer.step()
-
+                training_loss += loss.item()
                 # 每10个epoch，打印当前学习率
             if epoch % 10 == 0:
                 current_lr = optimizer.param_groups[0]['lr']
-                print(f"Epoch {epoch + 1}, Current Learning Rate: {current_lr:.6f}")
+                print(f"Epoch {epoch + 1}, Training Loss {training_loss / len(train_loader)},Current Learning Rate: {current_lr:.6f}")
 
             model.eval()
             valid_loss = 0.0
@@ -192,7 +197,7 @@ if __name__ == '__main__':
             scheduler.step()
 
     # 在循环结束后释放其它的大数据结构
-    del data1, industry_daily_mean_returns
+    del data1
     gc.collect()
 
     # 结束时间并计算运行时间
