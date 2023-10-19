@@ -94,9 +94,9 @@ def load_snippets(year_list, base_path, TN):
 
 
 if __name__ == '__main__':
-    TN = 1
+    TN = 4
     data: pd.DataFrame = pd.read_hdf("C:/Users/ipwx/Desktop/朱/_Alpha158_Financial01_Barra_HT_proceed.hdf")
-    for year in range(2022, 2023):
+    for year in range(2009, 2023):
         get_snippets_for_a_year(data, year, TN, 'C:\\Users\\ipwx\\Desktop\\testing\\')
     # get_snippets_for_a_year(data, 2009, TN, 'C:\\Users\\ipwx\\Desktop\\testing\\')
     # a, b, c = load_snippets([year for year in range(2009, 2022)], 'C:\\Users\\ipwx\\Desktop\\testing\\', TN)

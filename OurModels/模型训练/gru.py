@@ -42,7 +42,7 @@ if __name__ == '__main__':
     # print('截面中性化完的收益率',data1.NEXT_RET)
 
     # 对'NEXT_RET'列进行+1然后取对数操作
-    data1['NEXT_RET'] = np.log(data1['NEXT_RET'] + 1)
+    # data1['NEXT_RET'] = np.log(data1['NEXT_RET'] + 1)
     data = data1
     dates = data.index.get_level_values('date')
     start_date, end_date = dates.min(), dates.max()
@@ -104,19 +104,19 @@ if __name__ == '__main__':
     start_time = time.time()
 
     fac = pd.Series()
-    for year in range(2009, 2013):  # 从2010开始滚动，到2022
+    for year in range(2009, 2010):  # 从2010开始滚动，到2022
         logger.info(f"Training model for {year}...")
 
         # 定义滚动窗口
         train_start = date(year, 1, 1)
-        train_end = date(year + 9, 12, 31)
-        valid_start = date(year + 10, 1, 1)
-        valid_end = date(year + 10, 12, 31)
-        test_start = date(year + 11, 1, 1)
+        train_end = date(year + 8, 12, 31)
+        valid_start = date(year + 9, 1, 1)
+        valid_end = date(year + 9, 12, 31)
+        test_start = date(year + 10, 1, 1)
         if year == 2012:
-            test_end = date(2023, 6, 1)
+            test_end = date(2022, 6, 1)
         else:
-            test_end = date(year + 11, 12, 31)
+            test_end = date(year + 10, 12, 31)
 
         # 根据滚动窗口划分数据集
         train_data_df = data[(dates >= train_start) & (dates < train_end)]
@@ -134,11 +134,12 @@ if __name__ == '__main__':
         input_size = len(factor_cols)  # 根据训练数据更新input_size
 
         # 转换为 PyTorch tensor
-        new_X_train = give_serial_data(X_train)
-        X_train_tensor = torch.FloatTensor(new_X_train.values).unsqueeze(1)  # [batch, seq_len, input_size]
-        # 这里需要改变X_train_tensor
-        new_y_train = give_serial_data(y_train)
-        y_train_tensor = torch.FloatTensor(new_y_train.values)
+        # new_X_train = give_serial_data(X_train)
+        X_train_tensor = torch.FloatTensor(X_train.values).unsqueeze(1)  # [batch, seq_len, input_size]
+        # 这里需要改变X_train_tensor，将间隔记录下来
+
+        # new_y_train = give_serial_data(y_train)
+        y_train_tensor = torch.FloatTensor(y_train.values)
         X_valid_tensor = torch.FloatTensor(X_valid.values).unsqueeze(1)
         y_valid_tensor = torch.FloatTensor(y_valid.values)
 
@@ -206,9 +207,9 @@ if __name__ == '__main__':
 
     print(f"模型运行时间为: {elapsed_time_minutes:.2f} 分钟")
 
-    fac[:] = np.exp(fac) - 1
+    # fac[:] = np.exp(fac) - 1
     index_df = pd.DataFrame(fac.index.tolist(), columns=['date', 'stock'])
-    start_date_filter = datetime(2020, 1, 1).date()
+    start_date_filter = datetime(2019, 1, 1).date()
     end_date_filter = datetime(2023, 6, 1).date()
     filtered_indices = index_df[
         (index_df['date'] >= start_date_filter) &
@@ -227,7 +228,7 @@ if __name__ == '__main__':
     data.index =data.index.set_levels(new_levels, level='date')
 
     # 定义开始日期和结束日期
-    start_date = datetime.strptime('2020-01-01', '%Y-%m-%d').date()
+    start_date = datetime.strptime('2019-01-01', '%Y-%m-%d').date()
     end_date = datetime.strptime('2023-06-01', '%Y-%m-%d').date()
 
     # 使用多级索引的日期进行筛选

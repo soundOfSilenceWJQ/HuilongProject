@@ -1,15 +1,17 @@
-import os
-from datetime import date, datetime
+from datetime import date
 import pandas as pd
 import numpy as np
 from loguru import logger
 from quant_stock.pipeline import *
 
+
 def expo(x):
     return np.exp(x) - 1
 
+
 def log(x):
     return np.log(x + 1)
+
 
 def get_data_Xy(df, tag, factor_cols=None):
     # 抽取有效的列
@@ -47,3 +49,12 @@ def get_data_Xy(df, tag, factor_cols=None):
 
     # 返回数据
     return X, y, factor_cols
+
+
+def filter_by_date(df, start_date: date, end_date: date):
+    """根据日期过滤dataframe或者series"""
+    if start_date is not None:
+        df = df[df.index.get_level_values('date') >= start_date]
+    if end_date is not None:
+        df = df[df.index.get_level_values('date') <= end_date]
+    return df
