@@ -54,7 +54,7 @@ def get_snippets_for_a_year(df: pd.DataFrame, year, TN, base_path):
     data_X, data_y, _ = get_data_Xy(sub_df, str(year))
     # 查看data_X的列数
     print('data_X的列数是', len(data_X.columns))
-    # 选取sub_df中含'Alpha'的列
+    # 选取sub_df中含Alpha的列
     data_x_alpha = data_X.filter(regex='Alpha.*')
     print('data_alpha的列数是', len(data_x_alpha.columns))
     # data_X = extract_factor_columns(data=sub_df, pattern='Alpha.*')
@@ -74,7 +74,7 @@ def get_snippets_for_a_year(df: pd.DataFrame, year, TN, base_path):
 
 
 def load_snippets(year_list, base_path, TN):
-    '''从本地加载时间片段的数据'''
+    """从本地加载时间片段的数据"""
     snip_tensor_list = []
     tensor_y_list = []
     index_info_list = []
@@ -94,7 +94,7 @@ def load_snippets(year_list, base_path, TN):
 
 
 if __name__ == '__main__':
-    TN = 4
+    TN = 8
     data: pd.DataFrame = pd.read_hdf("C:/Users/ipwx/Desktop/朱/_Alpha158_Financial01_Barra_HT_proceed.hdf")
     for year in range(2009, 2023):
         get_snippets_for_a_year(data, year, TN, 'C:\\Users\\ipwx\\Desktop\\testing\\')
