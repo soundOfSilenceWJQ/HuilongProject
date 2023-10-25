@@ -1,0 +1,16 @@
+    class TrainConfig:
+        TN = 1  # 1代表只用当期数据，2代表用当期和前一期数据，以此类推
+        train_begin_year = 2009  # 从2009开始滚动
+        training_time_span = 9  # 用于训练的年份数
+        valid_time_span = 2  # 用于验证的年份数
+        batch_size = 256
+        input_size = 158  # 模型输入向量维度，即每个截面的因子数量
+        num_epochs = 10  # 训练epoch数
+        base_path = 'C:\\Users\\ipwx\\Desktop\\testing\\'
+        rolling_window = 2022 - train_begin_year - training_time_span - valid_time_span + 1  # 滚动次数，至少是1
+
+    class ModelConfig:
+        input_size = 158
+        hidden_size = 64
+        num_layers = 4
+        dropout = 0  # 模型训练参数，dropout rate

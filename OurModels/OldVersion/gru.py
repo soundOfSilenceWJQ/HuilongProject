@@ -98,13 +98,13 @@ if __name__ == '__main__':
     num_layers = 2
     dropout = 0.2
     batch_size = 256
-    num_epochs = 1
+    num_epochs = 5
 
     # 开始统计模型运行时间
     start_time = time.time()
 
     fac = pd.Series()
-    for year in range(2009, 2010):  # 从2010开始滚动，到2022
+    for year in range(2009, 2013):  # 从2010开始滚动，到2022
         logger.info(f"Training model for {year}...")
 
         # 定义滚动窗口
@@ -134,11 +134,7 @@ if __name__ == '__main__':
         input_size = len(factor_cols)  # 根据训练数据更新input_size
 
         # 转换为 PyTorch tensor
-        # new_X_train = give_serial_data(X_train)
         X_train_tensor = torch.FloatTensor(X_train.values).unsqueeze(1)  # [batch, seq_len, input_size]
-        # 这里需要改变X_train_tensor，将间隔记录下来
-
-        # new_y_train = give_serial_data(y_train)
         y_train_tensor = torch.FloatTensor(y_train.values)
         X_valid_tensor = torch.FloatTensor(X_valid.values).unsqueeze(1)
         y_valid_tensor = torch.FloatTensor(y_valid.values)

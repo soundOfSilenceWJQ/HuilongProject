@@ -44,7 +44,7 @@ def get_snippets(data: pd.DataFrame, TN=3, is_index_info_needed=False):
 
 
 def get_snippets_for_a_year(df: pd.DataFrame, year, TN, base_path):
-    '''生成结束月份在这一年的时间片段的个股因子数据以及收益率数据，还有index_info，存储到本地'''
+    """生成结束月份在这一年的时间片段的个股因子数据以及收益率数据，还有index_info，存储到本地"""
     # 截取这一年的dataframe
     start_date = date(year, 1, 1)
     new_start_date = start_date - pd.DateOffset(months=TN-1)
@@ -52,14 +52,10 @@ def get_snippets_for_a_year(df: pd.DataFrame, year, TN, base_path):
     end_date = date(year, 12, 31)
     sub_df = df[(df.index.get_level_values('date') >= new_start_date) & (df.index.get_level_values('date') <= end_date)]
     data_X, data_y, _ = get_data_Xy(sub_df, str(year))
-    # 查看data_X的列数
-    print('data_X的列数是', len(data_X.columns))
-    # 选取sub_df中含Alpha的列
-    data_x_alpha = data_X.filter(regex='Alpha.*')
-    print('data_alpha的列数是', len(data_x_alpha.columns))
-    # data_X = extract_factor_columns(data=sub_df, pattern='Alpha.*')
-    # data_y = sub_df['NEXT_RET']
-    snip_tensor_x, index_info = get_snippets(data_x_alpha, TN, True)
+    # 选取sub_df中含Alpha的列，这里可以添加其他的因子
+    data_x_factor = data_X.filter(regex='Alpha.*')
+    print('data_alpha的列数是', len(data_x_factor.columns))
+    snip_tensor_x, index_info = get_snippets(data_x_factor, TN, True)
     snip_tensor_y = get_snippets(data_y, TN, False)
     tensor_y = snip_tensor_y[:, -1]
     path = base_path + '\\' + 'TN=' + str(TN) + '\\' + str(year)

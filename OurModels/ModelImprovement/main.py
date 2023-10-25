@@ -18,8 +18,9 @@ from data_preparation import load_snippets
 
 from util import expo, log, filter_by_date
 
-# MODEL = ["MLP", "GRU", "LSTM"]
-MODEL = "MLP"
+# MODEL = ["MLP", "GRU", "LSTM", "Transformer"]
+MODEL = "Transformer"
+
 
 # 模型定义
 class MLPModel(nn.Module):
@@ -90,6 +91,17 @@ class LSTM(nn.Module):
         return output
 
 
+class Transformer(nn.Module):
+    def __init__(self, d_model=158, nhead=2, num_encoder_layers=1, num_decoder_layers=1):
+        super(Transformer, self).__init__()
+        self.transformer = nn.Transformer(d_model, nhead, num_encoder_layers, num_decoder_layers, batch_first=True)
+        self.fc = nn.Linear(d_model, 1)
+
+    def forward(self, src):
+        output = self.transformer(src, src)
+        return self.fc(output)
+
+
 if __name__ == '__main__':
     # 一些训练参数：
     class TrainConfig:
@@ -99,7 +111,7 @@ if __name__ == '__main__':
         valid_time_span = 0  # 用于验证的年份数
         batch_size = 256
         input_size = 158  # 模型输入向量维度，即每个截面的因子数量
-        num_epochs = 20  # 训练epoch数
+        num_epochs = 5  # 训练epoch数
         base_path = 'C:\\Users\\ipwx\\Desktop\\testing\\'
         rolling_window = 2022 - train_begin_year - training_time_span - valid_time_span + 1  # 滚动次数，至少是1
 
@@ -138,10 +150,12 @@ if __name__ == '__main__':
             model = GRU(ModelConfig.input_size, ModelConfig.hidden_size, 1, ModelConfig.dropout)
         elif MODEL == "LSTM":
             model = LSTM(ModelConfig.input_size, ModelConfig.hidden_size, 1, ModelConfig.dropout)
+        elif MODEL == "Transformer":
+            model = Transformer(ModelConfig.input_size, 2, 1, 1)
 
         criterion = nn.MSELoss()
         criterion2 = nn.L1Loss()
-        optimizer = Adam(model.parameters(), lr=0.01)  # 初始化时的学习率设置为0.01
+        optimizer = Adam(model.parameters(), lr=0.005)  # 初始化时的学习率设置为0.01
 
         # 定义当达到第5和10个epoch时降低学习率
         scheduler = MultiStepLR(optimizer, milestones=[int(TrainConfig.num_epochs / 2), int(TrainConfig.num_epochs / 4 * 3)], gamma=0.1)
