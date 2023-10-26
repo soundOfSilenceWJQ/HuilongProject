@@ -28,7 +28,7 @@ class GRUModel(nn.Module):
 
 if __name__ == '__main__':
     # 载入因子
-    data1: pd.DataFrame = pd.read_hdf('C:/Users/ipwx/Desktop/朱/_Alpha158_Financial01_Barra_HT_proceed.hdf')
+    data1: pd.DataFrame = pd.read_hdf('C:\\Users\ipwx\Desktop\\testing\hdf_files\Alpha158_processed.hdf')
     print(data1.NEXT_RET)
 
     # # Step 1: 计算每个日期每个行业的平均收益率
@@ -113,8 +113,8 @@ if __name__ == '__main__':
         valid_start = date(year + 9, 1, 1)
         valid_end = date(year + 9, 12, 31)
         test_start = date(year + 10, 1, 1)
-        if year == 2012:
-            test_end = date(2022, 6, 1)
+        if year == 2013:
+            test_end = date(2023, 6, 1)
         else:
             test_end = date(year + 10, 12, 31)
 
@@ -206,7 +206,7 @@ if __name__ == '__main__':
     # fac[:] = np.exp(fac) - 1
     index_df = pd.DataFrame(fac.index.tolist(), columns=['date', 'stock'])
     start_date_filter = datetime(2019, 1, 1).date()
-    end_date_filter = datetime(2023, 6, 1).date()
+    end_date_filter = datetime(2022, 12, 31).date()
     filtered_indices = index_df[
         (index_df['date'] >= start_date_filter) &
         (index_df['date'] <= end_date_filter)
@@ -225,7 +225,7 @@ if __name__ == '__main__':
 
     # 定义开始日期和结束日期
     start_date = datetime.strptime('2019-01-01', '%Y-%m-%d').date()
-    end_date = datetime.strptime('2023-06-01', '%Y-%m-%d').date()
+    end_date = datetime.strptime('2022-12-31', '%Y-%m-%d').date()
 
     # 使用多级索引的日期进行筛选
     data_filtered =data[(data.index.get_level_values('date') >= start_date) & (data.index.get_level_values('date') <= end_date)]

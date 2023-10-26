@@ -8,7 +8,7 @@ import numpy as np
 import torch
 
 
-def get_order(data: pd.DataFrame, sample_frac1=0.3, sample_frac2=0.9):
+def get_order(data: pd.DataFrame, sample_frac=0.9, k=3):
     data = data.filter(regex='Alpha.*|NEXT_RET')
     # 去掉data中含nan的行
     data = data.dropna(axis=0, how='any')
@@ -45,25 +45,26 @@ def get_order(data: pd.DataFrame, sample_frac1=0.3, sample_frac2=0.9):
     #         else:
     #             y_tensor = torch.cat((y_tensor, torch.tensor([0])))
 
-
     # 再处理截面维度
     for date in dates:
         print("begin to load:", date)
         date_data = data.xs(date, level='date')     # 这一时间截面的所有股票的数据
-        sample_df1 = date_data.sample(frac=sample_frac2)
-        sample_df2 = date_data.sample(frac=sample_frac2)
-        X1_tensor = torch.cat((X1_tensor, torch.from_numpy(np.array(sample_df1.filter(regex='Alpha.*')).astype(np.float32))))
-        X2_tensor = torch.cat((X2_tensor, torch.from_numpy(np.array(sample_df2.filter(regex='Alpha.*')).astype(np.float32))))
-        # 将sample_df1和sample_df2转换成numpy数组
-        array1 = torch.from_numpy(np.array(sample_df1['NEXT_RET']).astype(np.float32))
-        array2 = torch.from_numpy(np.array(sample_df2['NEXT_RET']).astype(np.float32))
-        for i in range(0, min(len(array1), len(array2))):
-            if array1[i] > array2[i]:
-                y_tensor = torch.cat((y_tensor, torch.tensor([1])))
-            elif array1[i] < array2[i]:
-                y_tensor = torch.cat((y_tensor, torch.tensor([-1])))
-            else:
-                y_tensor = torch.cat((y_tensor, torch.tensor([0])))
+        for j in range(0, k):
+            sample_df1 = date_data.sample(frac=sample_frac)
+            sample_df2 = date_data.sample(frac=sample_frac)
+
+            X1_tensor = torch.cat((X1_tensor, torch.from_numpy(np.array(sample_df1.filter(regex='Alpha.*')).astype(np.float32))))
+            X2_tensor = torch.cat((X2_tensor, torch.from_numpy(np.array(sample_df2.filter(regex='Alpha.*')).astype(np.float32))))
+            # 将sample_df1和sample_df2转换成numpy数组
+            array1 = torch.from_numpy(np.array(sample_df1['NEXT_RET']).astype(np.float32))
+            array2 = torch.from_numpy(np.array(sample_df2['NEXT_RET']).astype(np.float32))
+            for i in range(0, min(len(array1), len(array2))):
+                if array1[i] > array2[i]:
+                    y_tensor = torch.cat((y_tensor, torch.tensor([1])))
+                elif array1[i] < array2[i]:
+                    y_tensor = torch.cat((y_tensor, torch.tensor([-1])))
+                else:
+                    y_tensor = torch.cat((y_tensor, torch.tensor([0])))
 
     return X1_tensor, X2_tensor, y_tensor
 
